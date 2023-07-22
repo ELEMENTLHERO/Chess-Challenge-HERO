@@ -9,6 +9,8 @@ public class MyBot : IChessBot
     bool doOnce = true;
     int downUp = 0;
 
+    
+
     public Move Think(Board board, Timer timer)
     {
         if (doOnce)
@@ -18,30 +20,42 @@ public class MyBot : IChessBot
             doOnce = false;
         }
         Move[] moves = board.GetLegalMoves();
+        
+        return EvalMoves(moves,board,2).Key;
+    }
+
+    public KeyValuePair<Move,int> EvalMoves(Move[] moves, Board board, int depth)
+    {
+        if (depth == 0) return new KeyValuePair<Move, int>(Move.NullMove,0);
+
         Move bestMove = new Move();
         int bestValue = -100;
         //Dictionary<Move,int> rankedList = new Dictionary<Move, int>();
-        
+
         foreach (var move in moves)
         {
+            
             int value = 0;
             value = board.GetPiece(move.StartSquare).IsKing ? value - 1 : value;
-            value = (move.TargetSquare.Rank - move.StartSquare.Rank)*downUp;
-            if(move.IsCapture) 
+            value = (move.TargetSquare.Rank - move.StartSquare.Rank) * downUp;
+            if (move.IsCapture)
             {
                 value = getPieceValue(board.GetPiece(move.TargetSquare).PieceType) + value;
             }
+            //board.TrySkipTurn();
+            value = board.SquareIsAttackedByOpponent(move.StartSquare) ? getPieceValue(move.MovePieceType) + value : value;
+            //board.UndoSkipTurn();
             value = move.IsCastles ? value + 2 : value;
             value = move.IsEnPassant ? value + 5 : value;
             value = move.IsPromotion ? value + 15 : value;
             value = board.SquareIsAttackedByOpponent(move.TargetSquare) ? value - 25 - getPieceValue(move.MovePieceType) : value;
-            
             board.MakeMove(move);
             value = board.IsInCheck() ? value + 25 : value;
             value = board.IsInCheckmate() ? value + 1000 : value;
+            
+            //value += EvalMoves(board.GetLegalMoves(), board, depth - 1).Value;
             //value = board.IsDraw()
             board.UndoMove(move);
-            //rankedList.Add(move, value);
             //GetLegalMoves(true)
             if (value > bestValue)
             {
@@ -52,13 +66,8 @@ public class MyBot : IChessBot
         }
         Console.WriteLine("val: " + bestValue + " move: " + bestMove);
 
-        return bestMove;
+        return new KeyValuePair<Move, int>(bestMove, bestValue);
     }
-
-    //public Move EvalMove(Move[] move)
-    //{
-
-    //}
 
     public int getPieceValue(PieceType piece)
     {
