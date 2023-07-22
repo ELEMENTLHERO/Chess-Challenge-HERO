@@ -43,7 +43,7 @@ public class MyBot : IChessBot
                 value = getPieceValue(board.GetPiece(move.TargetSquare).PieceType) + value;
             }
             //board.TrySkipTurn();
-            value = board.SquareIsAttackedByOpponent(move.StartSquare) ? getPieceValue(move.MovePieceType) + value : value;
+            value = board.SquareIsAttackedByOpponent(move.StartSquare)&&!board.SquareIsAttackedByOpponent(move.TargetSquare) ? getPieceValue(move.MovePieceType) + value : value;
             //board.UndoSkipTurn();
             value = move.IsCastles ? value + 2 : value;
             value = move.IsEnPassant ? value + 5 : value;
