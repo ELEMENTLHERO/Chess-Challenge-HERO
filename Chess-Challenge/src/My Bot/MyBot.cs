@@ -48,6 +48,10 @@ public class MyBot : IChessBot
             //board.TrySkipTurn();
             value = board.SquareIsAttackedByOpponent(move.TargetSquare) ? - getPieceValue(move.MovePieceType) + value : value; //risk of being captured
             value = board.SquareIsAttackedByOpponent(move.StartSquare)&&!board.SquareIsAttackedByOpponent(move.TargetSquare) ? getPieceValue(move.MovePieceType) + value : value; //move only if you can get to saftey
+            value = getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare),!isWhite)-getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare),isWhite)+value;
+#if DEBUG
+            Console.WriteLine("move: "+move+" enemy value: "+getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare), !isWhite)+ " - "+ "my value: "+getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare), isWhite));
+#endif
             //board.UndoSkipTurn();
             value = ((float)getNumberOfSeenSquares(move.TargetSquare, move.MovePieceType, board) - (float)getNumberOfSeenSquares(move.StartSquare, move.MovePieceType, board))/2 + value; //prio lots of vision
             value = move.IsCastles ? value + 2 : value;
@@ -97,14 +101,177 @@ public class MyBot : IChessBot
         //BitboardHelper.GetKnightAttacks
         return new KeyValuePair<Move, float>(bestMove, bestValue);
     }
-    //TODO make list of squares which are protected
-    public bool attacking(Board board, Piece piece)
-    {
-        //ulong protectedSquares
-        //getAttackingSquares
 
-        return false;
+    public struct AttackDefendingBitboards
+    {
+        public ulong defendingSquares = 0;
+        public ulong attackedSquares = 0;
+        public Dictionary<PieceType, ulong> _defendingSquares;
+        public Dictionary<PieceType, ulong> _attackedSquares;
+
+        public AttackDefendingBitboards()
+        {
+            _defendingSquares = new Dictionary<PieceType, ulong>();
+            _attackedSquares = new Dictionary<PieceType, ulong>();
+
+            foreach (PieceType pieceType in Enum.GetValues(typeof(PieceType)))
+            {
+                _defendingSquares[pieceType] = 0;
+                _attackedSquares[pieceType] = 0;
+
+            }
+
+
+            
+        }
     }
+
+    /// <summary>
+    /// seems to work
+    /// </summary>
+    /// <param name="board"></param>
+    /// <returns></returns>
+    public AttackDefendingBitboards getProtectedSquares(Board board)
+    {
+        AttackDefendingBitboards attackDefendingBitboards = new AttackDefendingBitboards();
+
+        foreach (PieceList pieces in board.GetAllPieceLists())
+        {
+            foreach (Piece piece in pieces)
+            {
+                if (!(isWhite ^ piece.IsWhite)) //logical AND
+                {
+                    attackDefendingBitboards.defendingSquares |= getAttackingSquares(piece.Square, piece.PieceType, board);
+                    attackDefendingBitboards._defendingSquares[piece.PieceType] |= getAttackingSquares(piece.Square, piece.PieceType, board);
+                }
+                else if (isWhite ^ piece.IsWhite) //logical XOR (no need for else if)
+                {
+                    attackDefendingBitboards.attackedSquares |= getAttackingSquares(piece.Square, piece.PieceType, board);
+                    attackDefendingBitboards._attackedSquares[piece.PieceType] |= getAttackingSquares(piece.Square, piece.PieceType, board);
+
+                }
+            }
+        }
+        return attackDefendingBitboards;
+    }
+    //public List<Piece> squareAttackedBy(Board board, Square square)
+    //{
+    //    Dictionary<Square, List<Piece>> squaresInPlay = new Dictionary<Square, List<Piece>>();
+    //    AttackDefendingBitboards attackDefendingBitboards = getProtectedSquares(board);
+    //    foreach (PieceList pieces in board.GetAllPieceLists())
+    //    {
+    //        foreach (Piece piece in pieces)
+    //        {
+
+    //            if (!(isWhite ^ piece.IsWhite)) //logical AND
+    //            {
+    //                if(BitboardHelper.SquareIsSet(attackDefendingBitboards.defendingSquares, square))
+    //                {
+    //                    // add square and all pieces attacking that square squaresInPlay.Add(square,new List<Piece>());
+
+    //                }
+    //            }
+    //            else if (isWhite ^ piece.IsWhite) //logical XOR (no need for else if)
+    //            {
+    //                squaresInPlay.Add(BitboardHelper.SquareIsSet(attackDefendingBitboards.attackedSquares, square));
+
+    //            }
+    //        }
+    //    }
+
+    //}
+
+    public List<Piece> GetPiecesAttackingSquare(Board board, Square square)
+    {
+        List<Piece> attackingPieces = new List<Piece>();
+        AttackDefendingBitboards attackDefendingBitboards = getProtectedSquares(board);
+
+        foreach (PieceList pieces in board.GetAllPieceLists())
+        {
+            foreach (Piece piece in pieces)
+            {
+                if (piece.IsWhite == isWhite) // Check if the piece color matches the bot's color
+                {
+                    if (BitboardHelper.SquareIsSet(attackDefendingBitboards.defendingSquares, square))
+                    {
+                        attackingPieces.Add(piece); //make this simpler by removing else statement and if
+                    }
+                }
+                else
+                {
+                    BitboardHelper.VisualizeBitboard(attackDefendingBitboards._attackedSquares[PieceType.Bishop]);
+                    
+                    if (BitboardHelper.SquareIsSet(attackDefendingBitboards.attackedSquares, square))
+                    {
+                        attackingPieces.Add(piece);
+                    }
+                }
+            }
+        }
+
+        return attackingPieces;
+    }
+
+    public void getLowesAndHighestValueInList(List<Piece> pieces, out float lowest, out float highest) //broken
+    {
+        float currLowest = float.MaxValue;
+        float highestLowest = float.MinValue;
+        lowest = 0;
+        highest = 0;
+        foreach (var piece in pieces)
+        {
+            float value = getPieceValue(piece.PieceType);
+            if (value < currLowest)
+            {
+                currLowest = value;
+            }
+            if (value > highestLowest)
+            {
+                highestLowest = value;
+            }
+        }
+    }
+
+    public float getLowestValueInList(List<Piece> pieces, bool ownerIsWhite)
+    {
+        float currLowest = float.MaxValue;
+        foreach (var piece in pieces)
+        {
+            if (ownerIsWhite ^ piece.IsWhite) continue;
+            float value = getPieceValue(piece.PieceType);
+            if (value < currLowest)
+            {
+                currLowest = value;
+            }
+        }
+        if (currLowest == float.MaxValue)
+        {
+            return 0;
+        }
+        return currLowest;
+    }
+
+    //public void getAttackedSquares(Board board)
+    //{
+    //    Dictionary<Square,List<Piece>> squaresInPlay = new Dictionary<Square,List<Piece>>();
+    //    AttackDefendingBitboards attackDefendingBitboards = getProtectedSquares(board);
+    //    foreach (PieceList pieces in board.GetAllPieceLists())
+    //    {
+    //        foreach (Piece piece in pieces)
+    //        {
+    //            squaresInPlay.Add(BitboardHelper.SquareIsSet(attackDefendingBitboards))
+
+    //            if (!(isWhite ^ piece.IsWhite)) //logical AND
+    //            {
+    //            }
+    //            else if (isWhite ^ piece.IsWhite) //logical XOR (no need for else if)
+    //            {
+    //            }
+    //        }
+    //    }
+
+    //}
+
     public float getBoardValueDiff(Board board, bool isWhite)
     {
         float valueDiff = 0;
@@ -116,7 +283,7 @@ public class MyBot : IChessBot
                 {
                     valueDiff += getPieceValue(piece.PieceType);
                 }
-                else if (isWhite ^ piece.IsWhite) //logical XOR
+                else if (isWhite ^ piece.IsWhite) //logical XOR (no need for else if)
                 {
                     valueDiff -= getPieceValue(piece.PieceType);
                 }
@@ -142,7 +309,7 @@ public class MyBot : IChessBot
             case PieceType.Queen:
                 return 9;
             case PieceType.King:
-                return 1000;
+                return 500;
             default: return 0;
         }
 
