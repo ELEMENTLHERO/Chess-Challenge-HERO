@@ -48,18 +48,23 @@ public class MyBot : IChessBot
             //board.TrySkipTurn();
             value = board.SquareIsAttackedByOpponent(move.TargetSquare) ? - getPieceValue(move.MovePieceType) + value : value; //risk of being captured
             value = board.SquareIsAttackedByOpponent(move.StartSquare)&&!board.SquareIsAttackedByOpponent(move.TargetSquare) ? getPieceValue(move.MovePieceType) + value : value; //move only if you can get to saftey
-            value = getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare),!isWhite)-getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare),isWhite)+value;
+            value = getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare,false))-getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare,true))+value;
 #if DEBUG
-            Console.WriteLine("move: "+move+" enemy value: "+getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare), !isWhite)+ " - "+ "my value: "+getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare), isWhite));
+            if (move.TargetSquare.File == 1)
+            {
+
+            }
+            Console.WriteLine("move: " + move + " my value: " + getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare, false)) + " - " + "enemy value: " + getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare, true)));
+
 #endif
             //board.UndoSkipTurn();
             value = ((float)getNumberOfSeenSquares(move.TargetSquare, move.MovePieceType, board) - (float)getNumberOfSeenSquares(move.StartSquare, move.MovePieceType, board))/2 + value; //prio lots of vision
-            value = move.IsCastles ? value + 2 : value;
-            value = move.IsEnPassant ? value + 5 : value;
+            value = move.IsCastles ? value + 1 : value;
+            value = move.IsEnPassant ? value + 2 : value;
             value = move.IsPromotion ? value + 10 : value;
-            value = board.SquareIsAttackedByOpponent(move.TargetSquare) ? value - 25 - getPieceValue(move.MovePieceType) : value;
+            value = board.SquareIsAttackedByOpponent(move.TargetSquare) ? value - 5 - getPieceValue(move.MovePieceType) : value;
             board.MakeMove(move);
-            value = board.IsInCheck() ? value + 25 : value;
+            value = board.IsInCheck() ? value + 5 : value;
             value = board.IsInCheckmate() ? value + 1000 : value;
 #if DEBUG
 
@@ -78,7 +83,7 @@ public class MyBot : IChessBot
                 //Console.WriteLine("Want draw with: " + diff + " with move: " + move);
             }
 #endif
-
+            
 
             //board.ForceSkipTurn();
             //value += EvalMoves(board.GetLegalMoves(), board, depth - 1).Value;
@@ -104,8 +109,8 @@ public class MyBot : IChessBot
 
     public struct AttackDefendingBitboards
     {
-        public ulong defendingSquares = 0;
-        public ulong attackedSquares = 0;
+        //public ulong defendingSquares = 0;
+        //public ulong attackedSquares = 0;
         public Dictionary<PieceType, ulong> _defendingSquares;
         public Dictionary<PieceType, ulong> _attackedSquares;
 
@@ -141,12 +146,12 @@ public class MyBot : IChessBot
             {
                 if (!(isWhite ^ piece.IsWhite)) //logical AND
                 {
-                    attackDefendingBitboards.defendingSquares |= getAttackingSquares(piece.Square, piece.PieceType, board);
+                    //attackDefendingBitboards.defendingSquares |= getAttackingSquares(piece.Square, piece.PieceType, board);
                     attackDefendingBitboards._defendingSquares[piece.PieceType] |= getAttackingSquares(piece.Square, piece.PieceType, board);
                 }
                 else if (isWhite ^ piece.IsWhite) //logical XOR (no need for else if)
                 {
-                    attackDefendingBitboards.attackedSquares |= getAttackingSquares(piece.Square, piece.PieceType, board);
+                    //attackDefendingBitboards.attackedSquares |= getAttackingSquares(piece.Square, piece.PieceType, board);
                     attackDefendingBitboards._attackedSquares[piece.PieceType] |= getAttackingSquares(piece.Square, piece.PieceType, board);
 
                 }
@@ -181,38 +186,41 @@ public class MyBot : IChessBot
 
     //}
 
-    public List<Piece> GetPiecesAttackingSquare(Board board, Square square)
+    public HashSet<PieceType> GetPiecesAttackingSquare(Board board, Square square, bool my)
     {
-        List<Piece> attackingPieces = new List<Piece>();
+        HashSet<PieceType> attackingPieces = new HashSet<PieceType>();
         AttackDefendingBitboards attackDefendingBitboards = getProtectedSquares(board);
-
-        foreach (PieceList pieces in board.GetAllPieceLists())
+        if (my)
         {
-            foreach (Piece piece in pieces)
+            foreach (var attackBitboard in attackDefendingBitboards._defendingSquares)
             {
-                if (piece.IsWhite == isWhite) // Check if the piece color matches the bot's color
+                if (BitboardHelper.SquareIsSet(attackBitboard.Value, square))
                 {
-                    if (BitboardHelper.SquareIsSet(attackDefendingBitboards.defendingSquares, square))
-                    {
-                        attackingPieces.Add(piece); //make this simpler by removing else statement and if
-                    }
+                    attackingPieces.Add(attackBitboard.Key);
                 }
-                else
-                {
-                    BitboardHelper.VisualizeBitboard(attackDefendingBitboards._attackedSquares[PieceType.Bishop]);
-                    
-                    if (BitboardHelper.SquareIsSet(attackDefendingBitboards.attackedSquares, square))
-                    {
-                        attackingPieces.Add(piece);
-                    }
-                }
+
             }
         }
+        else
+        {
+            foreach (var attackBitboard in attackDefendingBitboards._attackedSquares)
+            {
+                if (BitboardHelper.SquareIsSet(attackBitboard.Value, square))
+                {
+                    attackingPieces.Add(attackBitboard.Key);
+                }
+
+            }
+        }
+
+#if DEBUG
+        //BitboardHelper.VisualizeBitboard(attackDefendingBitboards._attackedSquares[PieceType.Bishop]);
+#endif
 
         return attackingPieces;
     }
 
-    public void getLowesAndHighestValueInList(List<Piece> pieces, out float lowest, out float highest) //broken
+    public void getLowesAndHighestValueInList(HashSet<Piece> pieces, out float lowest, out float highest) //broken
     {
         float currLowest = float.MaxValue;
         float highestLowest = float.MinValue;
@@ -232,13 +240,12 @@ public class MyBot : IChessBot
         }
     }
 
-    public float getLowestValueInList(List<Piece> pieces, bool ownerIsWhite)
+    public float getLowestValueInList(HashSet<PieceType> pieces)
     {
         float currLowest = float.MaxValue;
         foreach (var piece in pieces)
         {
-            if (ownerIsWhite ^ piece.IsWhite) continue;
-            float value = getPieceValue(piece.PieceType);
+            float value = getPieceValue(piece);
             if (value < currLowest)
             {
                 currLowest = value;
