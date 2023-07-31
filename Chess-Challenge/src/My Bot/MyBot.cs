@@ -32,7 +32,7 @@ public class MyBot : IChessBot
         if (depth == 0) return new KeyValuePair<Move, float>(Move.NullMove,0);
 
         Move bestMove = new Move();
-        float bestValue = -100;
+        float bestValue = float.MinValue;
         //Dictionary<Move,int> rankedList = new Dictionary<Move, int>();
 
         foreach (var move in moves)
@@ -41,30 +41,38 @@ public class MyBot : IChessBot
             float value = 0;
             value = board.GetPiece(move.StartSquare).IsKing ? value - 1.5f : value;
             value = board.GetPiece(move.StartSquare).IsPawn ? value+(move.TargetSquare.Rank - move.StartSquare.Rank) * downUp *0.25f: value;
+            value = value + (move.TargetSquare.Rank - move.StartSquare.Rank) * downUp * 0.1f;
             if (move.IsCapture)
             {
                 value = getPieceValue(board.GetPiece(move.TargetSquare).PieceType) + value;
             }
             //board.TrySkipTurn();
-            value = board.SquareIsAttackedByOpponent(move.TargetSquare) ? - getPieceValue(move.MovePieceType) + value : value; //risk of being captured
+            //value = board.SquareIsAttackedByOpponent(move.TargetSquare) ? - getPieceValue(move.MovePieceType) + value : value; //risk of being captured
             value = board.SquareIsAttackedByOpponent(move.StartSquare)&&!board.SquareIsAttackedByOpponent(move.TargetSquare) ? getPieceValue(move.MovePieceType) + value : value; //move only if you can get to saftey
-            value = getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare,false))-getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare,true))+value;
 #if DEBUG
+            
             if (move.TargetSquare.File == 1)
             {
 
             }
-            Console.WriteLine("move: " + move + " my value: " + getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare, false)) + " - " + "enemy value: " + getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare, true)));
+            //Console.WriteLine("move: " + move + " my value: " + getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare, false)) + " - " + "enemy value: " + getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare, true)));
 
 #endif
             //board.UndoSkipTurn();
-            value = ((float)getNumberOfSeenSquares(move.TargetSquare, move.MovePieceType, board) - (float)getNumberOfSeenSquares(move.StartSquare, move.MovePieceType, board))/2 + value; //prio lots of vision
+            value = ((float)getNumberOfSeenSquares(move.TargetSquare, move.MovePieceType, board) - (float)getNumberOfSeenSquares(move.StartSquare, move.MovePieceType, board))/4 + value; //prio lots of vision
             value = move.IsCastles ? value + 1 : value;
             value = move.IsEnPassant ? value + 2 : value;
             value = move.IsPromotion ? value + 10 : value;
-            value = board.SquareIsAttackedByOpponent(move.TargetSquare) ? value - 5 - getPieceValue(move.MovePieceType) : value;
+            value = board.SquareIsAttackedByOpponent(move.TargetSquare) ? getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare, false)) - getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare, true)) + value: value;
             board.MakeMove(move);
-            value = board.IsInCheck() ? value + 5 : value;
+            //float test = getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare, false)) - getLowestValueInList(GetPiecesAttackingSquare(board, move.TargetSquare, true));
+            //if (test > 0)
+            //{
+            //    Console.WriteLine(board.GetFenString());
+            //    Console.WriteLine(test + "\n" + move);
+            //}
+            value = board.IsInCheck()&&board.SquareIsAttackedByOpponent(move.TargetSquare) ? value - 10 : value;
+            value = board.IsInCheck()? value + 5: value;
             value = board.IsInCheckmate() ? value + 1000 : value;
 #if DEBUG
 
@@ -316,7 +324,7 @@ public class MyBot : IChessBot
             case PieceType.Queen:
                 return 9;
             case PieceType.King:
-                return 500;
+                return 0;
             default: return 0;
         }
 
