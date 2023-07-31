@@ -1,4 +1,5 @@
 ﻿#define DEBUG
+#undef DEBUG
 
 using ChessChallenge.API;
 using System;
@@ -42,10 +43,7 @@ public class MyBot : IChessBot
             value = board.GetPiece(move.StartSquare).IsKing ? value - 1.5f : value;
             value = board.GetPiece(move.StartSquare).IsPawn ? value+(move.TargetSquare.Rank - move.StartSquare.Rank) * downUp *0.25f: value;
             value = value + (move.TargetSquare.Rank - move.StartSquare.Rank) * downUp * 0.1f;
-            if (move.IsCapture)
-            {
-                value = getPieceValue(board.GetPiece(move.TargetSquare).PieceType) + value;
-            }
+            value = move.IsCapture ? getPieceValue(board.GetPiece(move.TargetSquare).PieceType) + value : value;
             //board.TrySkipTurn();
             //value = board.SquareIsAttackedByOpponent(move.TargetSquare) ? - getPieceValue(move.MovePieceType) + value : value; //risk of being captured
             value = board.SquareIsAttackedByOpponent(move.StartSquare)&&!board.SquareIsAttackedByOpponent(move.TargetSquare) ? getPieceValue(move.MovePieceType) + value : value; //move only if you can get to saftey
@@ -117,8 +115,7 @@ public class MyBot : IChessBot
 
     public struct AttackDefendingBitboards
     {
-        //public ulong defendingSquares = 0;
-        //public ulong attackedSquares = 0;
+
         public Dictionary<PieceType, ulong> _defendingSquares;
         public Dictionary<PieceType, ulong> _attackedSquares;
 
@@ -228,26 +225,6 @@ public class MyBot : IChessBot
         return attackingPieces;
     }
 
-    public void getLowesAndHighestValueInList(HashSet<Piece> pieces, out float lowest, out float highest) //broken
-    {
-        float currLowest = float.MaxValue;
-        float highestLowest = float.MinValue;
-        lowest = 0;
-        highest = 0;
-        foreach (var piece in pieces)
-        {
-            float value = getPieceValue(piece.PieceType);
-            if (value < currLowest)
-            {
-                currLowest = value;
-            }
-            if (value > highestLowest)
-            {
-                highestLowest = value;
-            }
-        }
-    }
-
     public float getLowestValueInList(HashSet<PieceType> pieces)
     {
         float currLowest = float.MaxValue;
@@ -265,27 +242,6 @@ public class MyBot : IChessBot
         }
         return currLowest;
     }
-
-    //public void getAttackedSquares(Board board)
-    //{
-    //    Dictionary<Square,List<Piece>> squaresInPlay = new Dictionary<Square,List<Piece>>();
-    //    AttackDefendingBitboards attackDefendingBitboards = getProtectedSquares(board);
-    //    foreach (PieceList pieces in board.GetAllPieceLists())
-    //    {
-    //        foreach (Piece piece in pieces)
-    //        {
-    //            squaresInPlay.Add(BitboardHelper.SquareIsSet(attackDefendingBitboards))
-
-    //            if (!(isWhite ^ piece.IsWhite)) //logical AND
-    //            {
-    //            }
-    //            else if (isWhite ^ piece.IsWhite) //logical XOR (no need for else if)
-    //            {
-    //            }
-    //        }
-    //    }
-
-    //}
 
     public float getBoardValueDiff(Board board, bool isWhite)
     {
@@ -327,8 +283,6 @@ public class MyBot : IChessBot
                 return 0;
             default: return 0;
         }
-
-        // return Convert.ToInt32(Math.Pow(Convert.ToInt32(piece + 1), 2));
     }
 
     public int getNumberOfSeenSquares(Square square, PieceType piece, Board board)
@@ -347,7 +301,7 @@ public class MyBot : IChessBot
             case PieceType.Knight:
                 return BitboardHelper.GetKnightAttacks(square);
             case PieceType.Bishop:
-                return BitboardHelper.GetSliderAttacks(PieceType.Bishop, square, board); //todo remove friendly?
+                return BitboardHelper.GetSliderAttacks(PieceType.Bishop, square, board);
             case PieceType.Rook:
                 return BitboardHelper.GetSliderAttacks(PieceType.Rook, square, board);
             case PieceType.Queen:
